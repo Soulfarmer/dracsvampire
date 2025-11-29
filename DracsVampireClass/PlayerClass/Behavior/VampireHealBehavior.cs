@@ -1,7 +1,7 @@
+using System;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
-using Vintagestory.API.Server;
 using Vintagestory.GameContent;
 
 namespace DracsVampireClass;
@@ -13,13 +13,13 @@ namespace DracsVampireClass;
 public class VampireHealBehavior : EntityBehavior
 {
     // Amount to heal the interacting player by
-    public float healAmount = 10f;
+    float totalHeal;
     private Entity _ent;
     public VampireHealBehavior(Entity entity) : base(entity)
-    {
+    { 
         _ent = entity;
     }
-
+   
     public override string PropertyName()
     {
         return "HealOnInteractBehavior";
@@ -32,12 +32,11 @@ public class VampireHealBehavior : EntityBehavior
         if (!target.Alive)
             return;
         
-        // TODO: Apply saturation based on the size/type of the target
-        
         if (actor is EntityPlayer epl)
         {
-            epl.ReceiveSaturation(healAmount,EnumFoodCategory.Protein);
-            //actor.World.Logger.Debug("Healing player (bandage style)");
+            /* Healing must be done through EntityBehaviorHealth for the "normal" way doesnt work.*/
+            var hBehavior = actor.GetBehavior<EntityBehaviorHealth>();
+            hBehavior.ApplyDoTEffect(EnumDamageSource.Internal, EnumDamageType.Heal, 1, totalHeal, TimeSpan.FromSeconds(1),1,0);
         }
 
         // Damage the target entity
@@ -45,9 +44,10 @@ public class VampireHealBehavior : EntityBehavior
         {
             Source = EnumDamageSource.Internal,
             Type = EnumDamageType.PiercingAttack
-        }, healAmount);
+        }, this.totalHeal);
     }
     
+    //TODO: Add a particle effect when the player is interacting with a creature
     public override void OnInteract(EntityAgent byEntity, ItemSlot itemslot, Vec3d hit, EnumInteractMode mode, ref EnumHandling handled)
     {
         // AdvancedParticleProperties props = new AdvancedParticleProperties()

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Vintagestory.API.Client;
 using Vintagestory.API.Server;
 using Vintagestory.API.Common;
@@ -14,20 +15,43 @@ public class DracsVampireClassModSystem : ModSystem
     ICoreServerAPI sapi;
     Dictionary<string, PlayerClass> classes = new Dictionary<string, PlayerClass>();
     private int attachScanIntervalMs = 10000;
-
-
+    private ModConfigData config;
     public override void Start(ICoreAPI api)
     {
         base.Start(api);
+        TryToLoadConfig(api);
         api.RegisterEntityBehaviorClass("HealOnInteractBehavior",typeof(VampireHealBehavior));
     }
+
+    private void TryToLoadConfig(ICoreAPI api)
+    {
+        try
+        {
+            config = api.LoadModConfig<ModConfigData>("DracsVampireConfigData.json");
+            if (config == null) 
+            {
+                config = new ModConfigData();
+            }
+
+            //Save a copy of the mod config.
+            api.StoreModConfig<ModConfigData>(config, "DracsVampireConfigData.json");
+        }
+        catch (Exception e)
+        {
+            //Couldn't load the mod config... Create a new one with default settings, but don't save it.
+            Mod.Logger.Error("Could not load config! Loading default settings instead.");
+            Mod.Logger.Error(e);
+            config = new ModConfigData();
+        }
+    }
+
     public override void StartServerSide(ICoreServerAPI api)
     {
         base.StartServerSide(api);
         sapi = api;
         
         // Register all available classes
-        classes["vampire"] = new VampireClass();
+        classes["vampire"] = new VampireClass(config);
 
         api.Event.PlayerJoin += OnPlayerJoin;
         api.Event.OnPlayerInteractEntity += OnPlayerInteractEntity;
@@ -54,7 +78,7 @@ public class DracsVampireClassModSystem : ModSystem
     private void OnPlayerInteractEntity(Entity entity, IPlayer byPlayer, ItemSlot slot, Vec3d hitPosition, int mode, ref EnumHandling handling)
     {
         // Only trigger for right-click interact (mode 1)
-        if (mode != 1) return;
+        if (mode != (int)EnumInteractMode.Interact) return;
 
         // We only care about EntityPlayer
         EntityPlayer epl = byPlayer?.Entity as EntityPlayer;
@@ -63,11 +87,11 @@ public class DracsVampireClassModSystem : ModSystem
         // Check if player is a vampire
         if (!VampireClassManager.IsVampire(byPlayer))
             return;
-
+        
         // Player must have the behavior attached
         var beh = epl.GetBehavior<VampireHealBehavior>();
         if (beh == null) return;
-
+       
         // Execute the behavior logic
         beh.ApplySaturation(entity, epl);
     }
